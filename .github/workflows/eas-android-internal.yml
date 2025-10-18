@@ -15,10 +15,12 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
+     - name: Install dependencies
+        working-directory: ${{ github.workspace }}
         run: |
-          npm ci || npm install
-          npm i -g eas-cli
+          cd ${{ github.workspace }}
+          ls -la
+          npm install
 
       - name: Validate required assets
         run: |
