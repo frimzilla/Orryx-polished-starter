@@ -3,6 +3,12 @@ name: Build Android Internal APK (EAS)
 on:
   workflow_dispatch:
 
+# Set repo root as the default working directory for every step
+defaults:
+  run:
+    working-directory: ${{ github.workspace }}
+    shell: bash
+
 jobs:
   build-android-internal:
     runs-on: ubuntu-latest
@@ -10,17 +16,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # DEBUG: show where we are and what's here
+      - name: Show workspace tree
+        run: |
+          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+          pwd
+          ls -la
+          echo "---- assets ----"
+          ls -la assets || true
+          echo "---- package.json ----"
+          test -f package.json && cat package.json | head -n 20 || echo "package.json NOT FOUND"
+
+      # Hard-fail if package.json is missing (so we don't get npm enoent later)
+      - name: Verify package.json exists
+        run: |
+          if [ ! -f package.json ]; then
+            echo "::error::package.json not found at ${PWD}."
+            exit 1
+          fi
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-     - name: Install dependencies
-        working-directory: ${{ github.workspace }}
+      # Use npm install directly (we'll generate package-lock on first run)
+      - name: Install dependencies
         run: |
-          cd ${{ github.workspace }}
-          ls -la
-          npm install
+          npm install --no-audit --no-fund
+          test -f package-lock.json && echo "package-lock.json created."
 
       - name: Validate required assets
         run: |
@@ -36,12 +60,10 @@ jobs:
           done
 
       - name: Expo Doctor
-        run: |
-          npx --yes expo-doctor
+        run: npx --yes expo-doctor
 
       - name: EAS Build (Android internal APK)
-        run: |
-          eas build -p android --profile internal --non-interactive
+        run: eas build -p android --profile internal --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
